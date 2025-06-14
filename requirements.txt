@@ -1,0 +1,4 @@
+pylast
+mutagen
+tqdm
+python-dotenv 
