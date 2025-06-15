@@ -84,18 +84,15 @@ def get_top_tracks_for_artist(network, artist_name, limit=50):
     """Recupera le tracce più popolari per un dato artista da Last.fm."""
     try:
         artist = network.get_artist(artist_name)
-        top_tracks = artist.get_top_tracks(limit=limit)
-        # Restituisce solo i titoli normalizzati per un confronto più semplice
-        return [track.item.title.lower() for track in top_tracks]
+        # Restituisce l'intera lista di oggetti TopItem, che contengono titolo e rank
+        return artist.get_top_tracks(limit=limit)
     except pylast.WSError as e:
         # Artista non trovato o altro errore API
-        # print(f"Attenzione: Impossibile trovare l'artista '{artist_name}' su Last.fm. Errore: {e}")
         return []
 
-def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_plays=1000):
+def update_play_counts(db_path, username, tracks_to_update, music_folder):
     """Aggiorna il conteggio delle riproduzioni nel database di Navidrome."""
     print(f"Aggiornamento del database: {db_path}")
-    print("IMPORTANTE: Assicurati di aver fatto un backup del tuo file navidrome.db prima di continuare!")
     
     try:
         con = sqlite3.connect(db_path)
@@ -113,13 +110,12 @@ def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_
 
         # 2. Aggiorna i conteggi per ogni traccia
         updated_count = 0
-        for track in tqdm(tracks_to_update, desc="Aggiornamento Database"):
-            # Costruisci il percorso del file come lo vede Navidrome all'interno del container
+        for track, score in tqdm(tracks_to_update.items(), desc="Aggiornamento Database"):
+            # Costruisci il percorso del file come lo vede Navidrome
             try:
                 relative_path = pathlib.Path(track.path).relative_to(music_folder)
                 navidrome_path = relative_path.as_posix()
             except ValueError:
-                print(f"\nAttenzione: Impossibile calcolare il percorso relativo per {track.path}")
                 continue
 
             # Trova l'ID del media_file
@@ -131,22 +127,21 @@ def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_
             
             media_file_id = media_file_row[0]
 
-            # Controlla se esiste già un'annotazione (play count)
+            # Controlla se esiste già un'annotazione
             cur.execute("SELECT play_count FROM annotation WHERE item_id=? AND user_id=?", (media_file_id, user_id))
             annotation_row = cur.fetchone()
 
             if annotation_row:
-                # Aggiorna il conteggio esistente
-                new_play_count = annotation_row[0] + boost_plays
+                # Aggiorna il conteggio esistente con il nuovo punteggio
                 cur.execute(
                     "UPDATE annotation SET play_count = ?, play_date = CURRENT_TIMESTAMP WHERE item_id=? AND user_id=?",
-                    (new_play_count, media_file_id, user_id)
+                    (score, media_file_id, user_id)
                 )
             else:
-                # Inserisci una nuova annotazione
+                # Inserisci una nuova annotazione con il nuovo punteggio
                 cur.execute(
                     "INSERT INTO annotation (user_id, item_id, item_type, play_count, play_date) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                    (user_id, media_file_id, 'media_file', boost_plays)
+                    (user_id, media_file_id, 'media_file', score)
                 )
             updated_count += 1
 
@@ -219,25 +214,37 @@ def main():
     
     print(f"Trovati {len(tracks_by_artist)} artisti unici.")
 
-    # 4. Per ogni artista, ottenere le top tracce da Last.fm e confrontare
-    tracks_to_boost = []
+    # 4. Per ogni artista, ottenere le top tracce da Last.fm e creare la mappa dei punteggi
+    print("Recupero delle top tracce e calcolo dei punteggi ponderati...")
     
-    print("Recupero delle top tracce da Last.fm per ogni artista...")
+    BASE_SCORE = 10000  # Punteggio per la traccia #1
+    tracks_to_update = {}
+
     for artist_name, local_artist_tracks in tqdm(tracks_by_artist.items(), desc="Artisti Processati"):
-        top_track_titles = get_top_tracks_for_artist(network, artist_name)
-        
-        if not top_track_titles:
+        # Azzera i punteggi per tutte le canzoni dell'artista in questa esecuzione
+        for local_track in local_artist_tracks:
+            tracks_to_update[local_track] = 0
+
+        # Ottieni le top tracce da Last.fm
+        top_tracks = get_top_tracks_for_artist(network, artist_name)
+        if not top_tracks:
             continue
 
-        for local_track in local_artist_tracks:
-            if local_track.title.lower() in top_track_titles:
-                tracks_to_boost.append(local_track)
+        # Crea una mappa dei titoli per un confronto veloce
+        lastfm_titles_map = {track.item.title.lower(): track.rank for track in top_tracks}
 
-    print(f"Identificate {len(tracks_to_boost)} tracce da promuovere.")
+        # Assegna i punteggi ponderati solo alle hit
+        for local_track in local_artist_tracks:
+            rank = lastfm_titles_map.get(local_track.title.lower())
+            if rank is not None:
+                score = BASE_SCORE - (rank - 1)
+                tracks_to_update[local_track] = score
+
+    print(f"Identificate {len([s for s in tracks_to_update.values() if s > 0])} tracce da promuovere con punteggio ponderato.")
 
     # 5. Aggiornare il database di Navidrome
-    if tracks_to_boost:
-        update_play_counts(args.db_file, args.user, tracks_to_boost, args.music_folder)
+    if tracks_to_update:
+        update_play_counts(args.db_file, args.user, tracks_to_update, args.music_folder)
     else:
         print("Nessuna traccia da aggiornare.")
 
