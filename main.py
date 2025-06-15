@@ -231,7 +231,8 @@ def main():
             continue
 
         # Crea una mappa dei titoli per un confronto veloce
-        lastfm_titles_map = {track.item.title.lower(): track.rank for track in top_tracks}
+        # Usiamo enumerate per ottenere il rank dalla posizione nella lista (partendo da 1)
+        lastfm_titles_map = {track.item.title.lower(): i + 1 for i, track in enumerate(top_tracks)}
 
         # Assegna i punteggi ponderati solo alle hit
         for local_track in local_artist_tracks:
