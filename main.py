@@ -132,21 +132,21 @@ def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_
             media_file_id = media_file_row[0]
 
             # Controlla se esiste già un'annotazione (play count)
-            cur.execute("SELECT play_count FROM annotation WHERE media_file_id=? AND user_id=?", (media_file_id, user_id))
+            cur.execute("SELECT play_count FROM annotation WHERE item_id=? AND user_id=?", (media_file_id, user_id))
             annotation_row = cur.fetchone()
 
             if annotation_row:
                 # Aggiorna il conteggio esistente
                 new_play_count = annotation_row[0] + boost_plays
                 cur.execute(
-                    "UPDATE annotation SET play_count = ?, updated_at = CURRENT_TIMESTAMP WHERE media_file_id=? AND user_id=?",
+                    "UPDATE annotation SET play_count = ?, play_date = CURRENT_TIMESTAMP WHERE item_id=? AND user_id=?",
                     (new_play_count, media_file_id, user_id)
                 )
             else:
                 # Inserisci una nuova annotazione
                 cur.execute(
-                    "INSERT INTO annotation (id, user_id, media_file_id, play_count, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                    (f"{user_id}-{media_file_id}", user_id, media_file_id, boost_plays)
+                    "INSERT INTO annotation (user_id, item_id, item_type, play_count, play_date) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                    (user_id, media_file_id, 'media_file', boost_plays)
                 )
             updated_count += 1
 
