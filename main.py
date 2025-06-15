@@ -49,7 +49,7 @@ import pylast
 from dotenv import load_dotenv
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
-from mutagen.opus import Opus
+from mutagen.oggopus import OggOpus
 from tqdm import tqdm
 
 # --- STRUTTURA DATI ---
@@ -104,7 +104,7 @@ def get_local_tracks(music_folder):
                 artist = audio.get('artist', [None])[0]
                 title = audio.get('title', [None])[0]
             elif file.suffix == ".opus":
-                audio = Opus(file)
+                audio = OggOpus(file)
                 artist = audio.get('artist', [None])[0]
                 title = audio.get('title', [None])[0]
             else:
