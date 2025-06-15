@@ -4,11 +4,13 @@ This script updates the play count statistics of your Navidrome server to ensure
 
 ## Prerequisites
 
-- Python 3.8+
-- A working Navidrome installation
+- Python 3.8+ (on the host machine)
+- A working Navidrome installation running in Docker
 - An API Key and API Secret from [Last.fm](https://www.last.fm/api/account/create)
 
 ## Setup
+
+The setup is performed on your **host machine**, not inside the Docker container.
 
 1.  **Clone or download this repository.**
 
@@ -27,17 +29,55 @@ This script updates the play count statistics of your Navidrome server to ensure
     pip install -r requirements.txt
     ```
 
-## Usage
+## Usage (Docker Environment)
 
-**IMPORTANT:** Before running the script, it is strongly recommended to back up your Navidrome database (`navidrome.db`).
+This procedure ensures that the script runs safely without interfering with the Navidrome container.
 
-Run the script with the following command, replacing the paths and your username:
+### 1. Find Your Host Paths
+
+Use the `docker inspect` command to find the correct host paths for your data and music folders. Run this on your host machine:
 
 ```bash
+docker inspect <your_navidrome_container_name_or_id>
+```
+
+In the JSON output, look for the `"Mounts"` section. The `"Source"` field is the path on your host machine.
+
+- **Data Path**: Look for the mount where `"Destination"` is `/data`. The corresponding `"Source"` is your host path (often under `/var/lib/docker/volumes/...`).
+- **Music Path**: Look for the mount where `"Destination"` is `/music`.
+
+### 2. Run the Update Process
+
+This process involves temporarily stopping Navidrome to safely modify its database.
+
+**Step 1: Stop the Navidrome container**
+This prevents database corruption by ensuring the database file is not in use.
+```bash
+docker stop <your_navidrome_container_name_or_id>
+```
+
+**Step 2: Temporarily change database file ownership**
+You will likely need `sudo` for this. This command gives your user permission to write to the database file.
+```bash
+sudo chown $(whoami) <Source_path_for_data>/navidrome.db
+```
+
+**Step 3: Run the Python script**
+Make sure your virtual environment is activated (`source venv/bin/activate`). Run the script **without sudo**.
+```bash
 python3 main.py \
-  --db-file "/path/to/your/navidrome.db" \
-  --music-folder "/path/to/your/music" \
+  --db-file "<Source_path_for_data>/navidrome.db" \
+  --music-folder "<Source_path_for_music>" \
   --user "YOUR_NAVIDROME_USERNAME"
 ```
 
-After the script finishes, you may need to restart the Navidrome service to see the changes. 
+**Step 4: Restore original ownership**
+This is critical for Navidrome to be able to access its database again. The original owner is typically `root`.
+```bash
+sudo chown root <Source_path_for_data>/navidrome.db
+```
+
+**Step 5: Restart the Navidrome container**
+```bash
+docker start <your_navidrome_container_name_or_id>
+``` 
