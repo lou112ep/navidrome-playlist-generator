@@ -113,10 +113,15 @@ def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_
 
         # 2. Aggiorna i conteggi per ogni traccia
         updated_count = 0
+        not_found_count = 0
         for track in tqdm(tracks_to_update, desc="Aggiornamento Database"):
             # Costruisci il percorso del file come lo vede Navidrome all'interno del container
             try:
-                relative_path = pathlib.Path(track.path).relative_to(music_folder)
+                # Normalizza entrambi i percorsi per sicurezza
+                normalized_music_folder = os.path.normpath(music_folder)
+                normalized_track_path = os.path.normpath(track.path)
+                
+                relative_path = pathlib.Path(normalized_track_path).relative_to(normalized_music_folder)
                 navidrome_path = f"/music/{relative_path.as_posix()}"
             except ValueError:
                 print(f"\nAttenzione: Impossibile calcolare il percorso relativo per {track.path}")
@@ -127,7 +132,11 @@ def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_
             media_file_row = cur.fetchone()
 
             if not media_file_row:
-                # print(f"Attenzione: Traccia non trovata nel DB: {navidrome_path}")
+                if not_found_count < 1: # Stampa solo il primo errore per non inondare il terminale
+                    print(f"\nDEBUG: Prima traccia non trovata nel DB.")
+                    print(f"  - Percorso Host letto:   '{track.path}'")
+                    print(f"  - Percorso cercato nel DB: '{navidrome_path}'")
+                not_found_count += 1
                 continue
             
             media_file_id = media_file_row[0]
@@ -153,6 +162,8 @@ def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_
 
         con.commit()
         con.close()
+        if not_found_count > 0:
+            print(f"\nATTENZIONE: {not_found_count} su {len(tracks_to_update)} tracce non sono state trovate nel database. Controllare il formato dei percorsi.")
         print(f"Aggiornamento completato. {updated_count} tracce sono state aggiornate nel database.")
 
     except sqlite3.Error as e:
