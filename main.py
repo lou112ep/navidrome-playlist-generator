@@ -1,49 +1,8 @@
-import sys
-import os
-import importlib.util
-
-print("--- DIAGNOSTICA PYTHON ---")
-print(f"Versione Python: {sys.version}")
-print(f"Eseguibile Python: {sys.executable}")
-print("Percorsi di ricerca (sys.path):")
-for p in sys.path:
-    print(f"  - {p}")
-
-try:
-    spec = importlib.util.find_spec("mutagen")
-    if spec is None:
-        print("\nERRORE: La libreria 'mutagen' non è stata trovata da Python.")
-        sys.exit(1)
-
-    print(f"\n'mutagen' trovato in: {spec.origin}")
-    
-    # Verifichiamo se il sottomodulo 'opus' esiste
-    opus_spec = importlib.util.find_spec("mutagen.opus")
-    if opus_spec is None:
-        print("ERRORE: Il sottomodulo 'mutagen.opus' non è stato trovato.")
-        # Ispezioniamo la cartella di mutagen
-        mutagen_dir = os.path.dirname(spec.origin)
-        print(f"Contenuto della cartella di mutagen ({mutagen_dir}):")
-        try:
-            for item in os.listdir(mutagen_dir):
-                print(f"  - {item}")
-        except Exception as e:
-            print(f"  Impossibile leggere la cartella: {e}")
-        sys.exit(1)
-    else:
-        print(f"'mutagen.opus' trovato in: {opus_spec.origin}")
-
-except Exception as e:
-    print(f"\nSi è verificato un errore imprevisto durante la diagnostica: {e}")
-    sys.exit(1)
-
-print("--- DIAGNOSTICA COMPLETATA, AVVIO SCRIPT ---")
-# Se arriviamo qui, l'import dovrebbe funzionare.
-
-
 import argparse
+import os
 import pathlib
 import sqlite3
+import sys
 
 import pylast
 from dotenv import load_dotenv
