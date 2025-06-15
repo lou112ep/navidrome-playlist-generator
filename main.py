@@ -92,7 +92,7 @@ def get_top_tracks_for_artist(network, artist_name, limit=50):
         # print(f"Attenzione: Impossibile trovare l'artista '{artist_name}' su Last.fm. Errore: {e}")
         return []
 
-def update_play_counts(db_path, username, tracks_to_update, boost_plays=1000):
+def update_play_counts(db_path, username, tracks_to_update, music_folder, boost_plays=1000):
     """Aggiorna il conteggio delle riproduzioni nel database di Navidrome."""
     print(f"Aggiornamento del database: {db_path}")
     print("IMPORTANTE: Assicurati di aver fatto un backup del tuo file navidrome.db prima di continuare!")
@@ -114,12 +114,20 @@ def update_play_counts(db_path, username, tracks_to_update, boost_plays=1000):
         # 2. Aggiorna i conteggi per ogni traccia
         updated_count = 0
         for track in tqdm(tracks_to_update, desc="Aggiornamento Database"):
+            # Costruisci il percorso del file come lo vede Navidrome all'interno del container
+            try:
+                relative_path = pathlib.Path(track.path).relative_to(music_folder)
+                navidrome_path = f"/music/{relative_path.as_posix()}"
+            except ValueError:
+                print(f"\nAttenzione: Impossibile calcolare il percorso relativo per {track.path}")
+                continue
+
             # Trova l'ID del media_file
-            cur.execute("SELECT id FROM media_file WHERE path=?", (track.path,))
+            cur.execute("SELECT id FROM media_file WHERE path=?", (navidrome_path,))
             media_file_row = cur.fetchone()
 
             if not media_file_row:
-                # print(f"Attenzione: Traccia non trovata nel DB: {track.path}")
+                # print(f"Attenzione: Traccia non trovata nel DB: {navidrome_path}")
                 continue
             
             media_file_id = media_file_row[0]
@@ -230,7 +238,7 @@ def main():
 
     # 5. Aggiornare il database di Navidrome
     if tracks_to_boost:
-        update_play_counts(args.db_file, args.user, tracks_to_boost)
+        update_play_counts(args.db_file, args.user, tracks_to_boost, args.music_folder)
     else:
         print("Nessuna traccia da aggiornare.")
 

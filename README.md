@@ -48,7 +48,7 @@ In the JSON output, look for the `"Mounts"` section. The `"Source"` field is the
 
 ### 2. Run the Update Process
 
-This process involves temporarily stopping Navidrome to safely modify its database.
+This process requires running the script with `sudo` to access Docker-managed files, but it's crucial to use the Python executable from your virtual environment (`venv`) to ensure all dependencies are found.
 
 **Step 1: Stop the Navidrome container**
 This prevents database corruption by ensuring the database file is not in use.
@@ -56,28 +56,17 @@ This prevents database corruption by ensuring the database file is not in use.
 docker stop <your_navidrome_container_name_or_id>
 ```
 
-**Step 2: Temporarily change database file ownership**
-You will likely need `sudo` for this. This command gives your user permission to write to the database file.
+**Step 2: Run the Python script with `sudo`**
+Make sure your virtual environment is activated (`source venv/bin/activate`). The command must use the full path to the Python executable within your `venv` directory.
 ```bash
-sudo chown $(whoami) <Source_path_for_data>/navidrome.db
-```
-
-**Step 3: Run the Python script**
-Make sure your virtual environment is activated (`source venv/bin/activate`). Run the script **without sudo**.
-```bash
-python3 main.py \
+sudo /path/to/your/project/venv/bin/python3 main.py \
   --db-file "<Source_path_for_data>/navidrome.db" \
   --music-folder "<Source_path_for_music>" \
   --user "YOUR_NAVIDROME_USERNAME"
 ```
+*Replace `/path/to/your/project` with the actual path to the script's directory.*
 
-**Step 4: Restore original ownership**
-This is critical for Navidrome to be able to access its database again. The original owner is typically `root`.
-```bash
-sudo chown root <Source_path_for_data>/navidrome.db
-```
-
-**Step 5: Restart the Navidrome container**
+**Step 3: Restart the Navidrome container**
 ```bash
 docker start <your_navidrome_container_name_or_id>
 ``` 
